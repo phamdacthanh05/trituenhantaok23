@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nhận Diện Chó và Mèo - Faster R-CNN</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f1f5f9;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+            text-align: center;
+            width: 100%;
+            max-width: 500px;
+            box-sizing: border-box;
+        }
+        h2 { 
+            color: #1e293b; 
+            margin-top: 0;
+            margin-bottom: 25px; 
+            font-size: 24px;
+        }
+        .upload-box {
+            border: 2px dashed #cbd5e1;
+            padding: 20px;
+            border-radius: 12px;
+            cursor: pointer;
+            background-color: #f8fafc;
+            transition: all 0.3s ease;
+        }
+        .upload-box:hover { 
+            border-color: #3b82f6; 
+            background-color: #eff6ff; 
+        }
+        #image-preview {
+            max-width: 100%;
+            max-height: 350px;
+            margin-top: 15px;
+            border-radius: 8px;
+            object-fit: contain;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+        }
+        button {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 14px 24px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 20px;
+            width: 100%;
+            font-weight: bold;
+            transition: background-color 0.2s ease;
+        }
+        button:hover { 
+            background-color: #2563eb; 
+        }
+        #result-box {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            background-color: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            display: none;
+        }
+        .label { 
+            font-size: 16px; 
+            font-weight: bold; 
+            color: #166534; 
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Nhận diện Chó & Mèo bằng CNN</h2>
+    
+    <div class="upload-box" onclick="document.getElementById('file-input').click()">
+        <p style="margin: 0; color: #64748b; font-weight: 500;">Click vào đây để chọn hoặc kéo thả ảnh</p>
+        <input type="file" id="file-input" accept="image/*" style="display: none;" onchange="previewImage(this)">
+        <img id="image-preview" src="https://i.imgur.com/b97ApxX.png" alt="Xem trước ảnh">
+    </div>
+
+    <button onclick="uploadAndPredict()">Bắt đầu nhận diện</button>
+
+    <div id="result-box">
+        <div class="label" id="prediction-text">Kết quả: Đang tính toán...</div>
+    </div>
+</div>
+
+<script>
+    // Hàm hiển thị bản xem trước khi người dùng vừa chọn ảnh mới từ máy tính
+    function previewImage(input) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const output = document.getElementById('image-preview');
+                output.src = e.target.result;
+                // Ẩn ô kết quả cũ đi khi đổi ảnh mới
+                document.getElementById('result-box').style.display = 'none';
+            }
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    // Hàm gửi ảnh lên API Flask và nhận kết quả ảnh có khung định vị
+    async function uploadAndPredict() {
+        const fileInput = document.getElementById('file-input');
+        if (fileInput.files.length === 0) {
+            alert('Vui lòng chọn một file ảnh trước khi bấm nhận diện!');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        const resultBox = document.getElementById('result-box');
+        const predText = document.getElementById('prediction-text');
+        
+        // Trạng thái chờ xử lý
+        predText.innerText = "Mô hình Faster R-CNN đang phân tích ảnh...";
+        resultBox.style.display = 'block';
+
+        try {
+            const response = await fetch('/predict', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            
+            if (data.error) {
+                predText.innerHTML = `<span style="color:#dc2626">Lỗi: ${data.error}</span>`;
+            } else {
+                predText.innerHTML = `Kết quả từ Model: <span style="color:#2563eb">${data.result}</span>`;
+                
+                // Nếu Backend xử lý vẽ khung thành công và trả về link ảnh mới
+                if (data.image_url) {
+                    document.getElementById('image-preview').src = data.image_url;
+                }
+            }
+        } catch (error) {
+            predText.innerHTML = `<span style="color:#dc2626">Lỗi kết nối đến Server Flask!</span>`;
+        }
+    }
+</script>
+</body>
+</html>
