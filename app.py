@@ -6,16 +6,15 @@ import torchvision.transforms as transforms
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 import io
+import torch.nn.functional as F
 
 app = Flask(__name__)
 CORS(app)
 
 # --- 1. CẤU HÌNH MODEL ---
-# Phải trùng khớp 100% với cấu trúc khi huấn luyện
 model = models.resnet18(pretrained=False)
 model.fc = nn.Linear(model.fc.in_features, 2) 
 
-# Load trọng số đã train
 try:
     model.load_state_dict(torch.load('cat_dog_model.pth', map_location='cpu'))
     model.eval()
@@ -31,13 +30,10 @@ transform = transforms.Compose([
 ])
 
 # --- 3. CÁC ĐƯỜNG DẪN (ROUTES) ---
-
-# Route phục vụ giao diện Web (index.html trong thư mục templates)
 @app.route('/', methods=['GET'])
 def index():
     return render_template('index.html')
 
-# API Dự đoán (được gọi từ JavaScript)
 @app.route('/predict', methods=['POST'])
 def predict():
     if 'file' not in request.files:
@@ -46,23 +42,25 @@ def predict():
     file = request.files['file']
     
     try:
-        # Chuyển đổi dữ liệu ảnh
         img = Image.open(io.BytesIO(file.read())).convert('RGB')
         img_t = transform(img).unsqueeze(0)
         
-        # Chạy dự đoán
         with torch.no_grad():
             output = model(img_t)
-            _, predicted = torch.max(output, 1)
             
-            # 0: Mèo, 1: Chó (dựa trên thứ tự alphabet của thư mục)
+            # Sử dụng Softmax để tính xác suất
+            probabilities = F.softmax(output, dim=1)
+            
+            # Lấy giá trị cao nhất
+            prob, predicted = torch.max(probabilities, 1)
+            
             label = "Mèo" if predicted.item() == 0 else "Chó"
+            confidence = round(prob.item() * 100, 2)
             
-        return jsonify({'result': label})
+        return jsonify({'result': label, 'confidence': confidence})
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# --- 4. CHẠY SERVER ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

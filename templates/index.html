@@ -3,156 +3,90 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nhận Diện Chó và Mèo - Faster R-CNN</title>
+    <title>AI Animal Classifier</title>
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f1f5f9;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
-        .container {
-            background-color: #ffffff;
-            padding: 30px;
-            border-radius: 16px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
-            text-align: center;
-            width: 100%;
-            max-width: 500px;
-            box-sizing: border-box;
-        }
-        h2 { 
-            color: #1e293b; 
-            margin-top: 0;
-            margin-bottom: 25px; 
-            font-size: 24px;
-        }
-        .upload-box {
-            border: 2px dashed #cbd5e1;
-            padding: 20px;
-            border-radius: 12px;
-            cursor: pointer;
-            background-color: #f8fafc;
-            transition: all 0.3s ease;
-        }
-        .upload-box:hover { 
-            border-color: #3b82f6; 
-            background-color: #eff6ff; 
-        }
-        #image-preview {
-            max-width: 100%;
-            max-height: 350px;
-            margin-top: 15px;
-            border-radius: 8px;
-            object-fit: contain;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
-        }
-        button {
-            background-color: #3b82f6;
-            color: white;
-            border: none;
-            padding: 14px 24px;
-            font-size: 16px;
-            border-radius: 8px;
-            cursor: pointer;
-            margin-top: 20px;
-            width: 100%;
-            font-weight: bold;
-            transition: background-color 0.2s ease;
-        }
-        button:hover { 
-            background-color: #2563eb; 
-        }
-        #result-box {
-            margin-top: 20px;
-            padding: 15px;
-            border-radius: 8px;
-            background-color: #f0fdf4;
-            border: 1px solid #bbf7d0;
-            display: none;
-        }
-        .label { 
-            font-size: 16px; 
-            font-weight: bold; 
-            color: #166534; 
-            line-height: 1.5;
-        }
+        :root { --primary: #6366f1; --bg: #f8fafc; }
+        body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #eef2ff, #e0e7ff); min-height: 100vh; display: flex; justify-content: center; align-items: center; margin: 0; }
+        .container { background: white; padding: 2rem; border-radius: 24px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); width: 90%; max-width: 400px; text-align: center; }
+        
+        h2 { color: #1e293b; margin-bottom: 1.5rem; }
+        
+        .upload-box { border: 2px dashed #c7d2fe; padding: 2rem; border-radius: 16px; cursor: pointer; transition: 0.3s; background: #fafafa; }
+        .upload-box:hover { border-color: var(--primary); background: #f5f3ff; }
+        
+        #image-preview { max-width: 100%; border-radius: 12px; margin-top: 1rem; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        
+        button { background: var(--primary); color: white; border: none; padding: 12px 24px; border-radius: 12px; font-weight: 600; cursor: pointer; width: 100%; margin-top: 1.5rem; transition: 0.2s; }
+        button:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); }
+
+        #result-box { margin-top: 1.5rem; padding: 1rem; border-radius: 16px; background: #f8fafc; display: none; text-align: left; }
+        
+        /* Thanh xác suất */
+        .progress-container { height: 8px; background: #e2e8f0; border-radius: 4px; margin-top: 8px; overflow: hidden; }
+        .progress-bar { height: 100%; background: var(--primary); width: 0%; transition: width 1s ease-in-out; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>Nhận diện Chó & Mèo bằng CNN</h2>
-    
+    <h2>🐶 Nhận diện thú cưng</h2>
     <div class="upload-box" onclick="document.getElementById('file-input').click()">
-        <p style="margin: 0; color: #64748b; font-weight: 500;">Click vào đây để chọn hoặc kéo thả ảnh</p>
+        <p style="color: #64748b;">Chọn ảnh để bắt đầu</p>
         <input type="file" id="file-input" accept="image/*" style="display: none;" onchange="previewImage(this)">
-        <img id="image-preview" src="https://i.imgur.com/b97ApxX.png" alt="Xem trước ảnh">
+        <img id="image-preview" src="#" alt="Preview">
     </div>
 
-    <button onclick="uploadAndPredict()">Bắt đầu nhận diện</button>
+    <button id="predict-btn" onclick="uploadAndPredict()">Phân tích ảnh</button>
 
     <div id="result-box">
-        <div class="label" id="prediction-text">Kết quả: Đang tính toán...</div>
+        <div id="prediction-text" style="font-weight: 600; color: #1e293b;"></div>
+        <div class="progress-container">
+            <div id="progress-bar" class="progress-bar"></div>
+        </div>
+        <div id="conf-text" style="font-size: 0.8rem; color: #64748b; margin-top: 4px;"></div>
     </div>
 </div>
 
 <script>
-    // Hàm hiển thị bản xem trước khi người dùng vừa chọn ảnh mới từ máy tính
     function previewImage(input) {
         if (input.files && input.files[0]) {
             const reader = new FileReader();
-            reader.onload = function(e) {
-                const output = document.getElementById('image-preview');
-                output.src = e.target.result;
-                // Ẩn ô kết quả cũ đi khi đổi ảnh mới
+            reader.onload = (e) => {
+                const img = document.getElementById('image-preview');
+                img.src = e.target.result;
+                img.style.display = 'block';
                 document.getElementById('result-box').style.display = 'none';
             }
             reader.readAsDataURL(input.files[0]);
         }
     }
 
-    // Hàm gửi ảnh lên API Flask và nhận kết quả ảnh có khung định vị
     async function uploadAndPredict() {
         const fileInput = document.getElementById('file-input');
-        if (fileInput.files.length === 0) {
-            alert('Vui lòng chọn một file ảnh trước khi bấm nhận diện!');
-            return;
-        }
+        if (fileInput.files.length === 0) return alert('Vui lòng chọn ảnh!');
+
+        const btn = document.getElementById('predict-btn');
+        const resBox = document.getElementById('result-box');
+        
+        btn.innerText = "Đang xử lý...";
+        btn.disabled = true;
 
         const formData = new FormData();
         formData.append('file', fileInput.files[0]);
 
-        const resultBox = document.getElementById('result-box');
-        const predText = document.getElementById('prediction-text');
-        
-        // Trạng thái chờ xử lý
-        predText.innerText = "Mô hình Faster R-CNN đang phân tích ảnh...";
-        resultBox.style.display = 'block';
-
         try {
-            const response = await fetch('/predict', {
-                method: 'POST',
-                body: formData
-            });
+            const response = await fetch('/predict', { method: 'POST', body: formData });
             const data = await response.json();
             
-            if (data.error) {
-                predText.innerHTML = `<span style="color:#dc2626">Lỗi: ${data.error}</span>`;
-            } else {
-                predText.innerHTML = `Kết quả từ Model: <span style="color:#2563eb">${data.result}</span>`;
-                
-                // Nếu Backend xử lý vẽ khung thành công và trả về link ảnh mới
-                if (data.image_url) {
-                    document.getElementById('image-preview').src = data.image_url;
-                }
-            }
-        } catch (error) {
-            predText.innerHTML = `<span style="color:#dc2626">Lỗi kết nối đến Server Flask!</span>`;
+            resBox.style.display = 'block';
+            document.getElementById('prediction-text').innerText = `Kết quả: ${data.result}`;
+            document.getElementById('conf-text').innerText = `Độ tin cậy: ${data.confidence}%`;
+            document.getElementById('progress-bar').style.width = data.confidence + "%";
+        } catch (e) {
+            alert("Lỗi server!");
+        } finally {
+            btn.innerText = "Phân tích ảnh";
+            btn.disabled = false;
         }
     }
 </script>
